@@ -1,0 +1,13 @@
+version: '3.3'
+
+services:
+  github:
+    environment:
+      - ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER=true
+      - ACTIONS_RUNNER_CONTAINER_HOOKS=/scripts/actions_runner_container_hooks/docker.js
+    image: 340268328991.dkr.ecr.eu-west-2.amazonaws.com/callisto/self-hosted-runner-drone
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # - ./packages/docker/dist/index.js:/scripts/actions_runner_container_hooks/docker.js
+    command: tail -F /dev/null
+

@@ -48,15 +48,15 @@ export async function createContainer(
     }
   }
 
-  const mountVolumes = [
-    ...(args.userMountVolumes || []),
-    ...(args.systemMountVolumes || [])
-  ]
-  for (const mountVolume of mountVolumes) {
-    dockerArgs.push(
-      `-v=${mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}`
-    )
-  }
+  // const mountVolumes = [
+  //   ...(args.userMountVolumes || []),
+  //   ...(args.systemMountVolumes || [])
+  // ]
+  // for (const mountVolume of mountVolumes) {
+  //   dockerArgs.push(
+  //     `-v=${mountVolume.sourceVolumePath}:${mountVolume.targetVolumePath}`
+  //   )
+  // }
   if (args.entryPoint) {
     dockerArgs.push(`--entrypoint`)
     dockerArgs.push(args.entryPoint)

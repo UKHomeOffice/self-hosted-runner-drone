@@ -1,31 +1,60 @@
-## Runner Container Hooks
-The Runner Container Hooks repo provides a set of packages that implement the container hooks feature in the [actions/runner](https://github.com/actions/runner). These can be used as is, or you can use them as a guide to implement your own hooks.
+## Self-hosted runner
 
-More information on how to implement your own hooks can be found in the [adr](https://github.com/actions/runner/pull/1891). The `examples` folder provides example inputs for each hook.
+Our deployment environments are locked down and not publicly accessible. This means that we can't use
+GitHub actions to perform our deployments. Our current CI/CD platform is Drone which also limits us to a
+single pipeline configuration file. 
 
-## Background 
+### The challenge
 
-Three projects are included in the `packages` folder
-- k8s: A kubernetes hook implementation that spins up pods dynamically to run a job. More details can be found in the [readme](./packages/k8s/README.md)
-- docker: A hook implementation of the runner's docker implementation. More details can be found in the [readme](./packages/docker/README.md)
-- hooklib: a shared library which contains typescript definitions and utilities that the other projects consume
+If we use GitHub actions in any part of our workflow we can't create an uninterrupted workflow that deploys
+into an environment. We have considered building in GitHub and using tags to trigger deployments. Whilst
+this works for releases, it isn't suitable for branch builds/deploys as it would litter the repository
+with tags and/or move tags on a public repo (considered bad practice to many).
 
-### Requirements
+GitHub-hosted runners can't connect to our CI/CD platform and trigger build.
 
-We welcome contributions.  See [how to contribute to get started](./CONTRIBUTING.md).
+### The solution
 
-## License 
+The solution is to deploy a self-hosted runner that can access our CI/CD platform. However, self-hosted 
+runners are only recommended for private repositories [self-hosted-runner-security](https://docs.github.com/en/actions/hosting-your-own-runners/about-self-hosted-runners#self-hosted-runner-security).
 
-This project is licensed under the terms of the MIT open source license. Please refer to [MIT](./LICENSE.md) for the full terms.
+To mitigate this we have created this runner to severely restrict the actions that can be performed.
+The runner forces jobs to always runs inside a container which subsequently ensures our container 
+customizations are applied. 
 
-## Maintainers 
+The following customisations are applied  
 
-See the [Codeowners](./CODEOWNERS)
+* Container image is restriced to a single known image
+* No volumes are shared between runner and container
+* No source code is downloaded from the repository
+* Only a runner managed script is sent to the container to be run.
+* The environment variables used in the managed script are controlled by the GitHub action
 
-## Support
+### Solution overview
 
-Find a bug? Please file an issue in this repository using the issue templates.
+<img width="800px" src="./overview.png?raw=true" />
 
-## Code of Conduct
+## Deployment
 
-See our [Code of Conduct](./CODE_OF_CONDUCT.MD)
+The customisations have been applied to the docker and k8s hooks so the runner can be deployed in either mode.
+
+## Build
+
+### Runner container hooks
+
+### Runner docker image
+
+### TODO
+Code owners
+Code of conduct
+Consider removing running jobs (Don't think it's required)
+Reduce required permissions (if removing jobs)
+Make drone base url an environment variable
+Pipeline
+Documentation for building in readme (useful commands and mounting hostpath to test development)
+Throw an error if their step is not attempting to run drone
+Check drone token env var exists
+Build and push Image
+Branch protection for main and drone-only(effectively our main)
+Clean up downloaded files in dockerfile i.e. docker and actions installer
+Allow image name to be configured as admission control sometimes restricts registries and also to account for registry prefixes

@@ -4,6 +4,23 @@ import * as os from 'os'
 import * as readline from 'readline'
 import { HookData } from './interfaces'
 
+export async function getFileContents(filePath: string): Promise<string> {
+  let contents = ''
+  let reading = false
+  const fileStream = fs.createReadStream(filePath)
+  const rl = readline.createInterface({
+    input: fileStream
+  })
+  rl.on('line', line => {
+    if (reading) contents += '\n'
+    reading = true
+    contents += line
+  })
+  await events.default.once(rl, 'close')
+
+  return contents
+}
+
 export async function getInputFromStdin(): Promise<HookData> {
   let input = ''
 

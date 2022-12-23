@@ -52,20 +52,30 @@ export const requiredPermissions = [
     verbs: ['create', 'delete', 'get', 'list'],
     resource: 'secrets',
     subresource: ''
+  },
+  {
+    group: '',
+    verbs: ['create', 'delete', 'get', 'list'],
+    resource: 'configmaps',
+    subresource: ''
   }
 ]
 
 export async function createPod(
   jobContainer?: k8s.V1Container,
-  services?: k8s.V1Container[],
+  createdConfigMap?: k8s.V1ConfigMap,
   registry?: Registry
 ): Promise<k8s.V1Pod> {
   const containers: k8s.V1Container[] = []
   if (jobContainer) {
+    jobContainer.volumeMounts = [
+      {
+        name: 'scripts',
+        mountPath: '/scripts/drone.sh',
+        subPath: 'drone.sh'
+      }
+    ]
     containers.push(jobContainer)
-  }
-  if (services?.length) {
-    containers.push(...services)
   }
 
   const appPod = new k8s.V1Pod()
@@ -85,13 +95,17 @@ export async function createPod(
   appPod.spec.containers = containers
   appPod.spec.restartPolicy = 'Never'
   appPod.spec.nodeName = await getCurrentNodeName()
-  const claimName = getVolumeClaimName()
-  appPod.spec.volumes = [
-    {
-      name: 'work',
-      persistentVolumeClaim: { claimName }
-    }
-  ]
+  // const claimName = getVolumeClaimName()
+  if (createdConfigMap?.metadata?.name) {
+    appPod.spec.volumes = [
+      {
+        name: 'scripts',
+        configMap: {
+          name: createdConfigMap?.metadata?.name
+        }
+      }
+    ]
+  }
 
   if (registry) {
     const secret = await createDockerSecret(registry)
@@ -141,6 +155,31 @@ export async function createJob(
   return body
 }
 
+export async function createConfigMap(
+  name: string,
+  data?: { [key: string]: string },
+  binaryData?: { [key: string]: string }
+): Promise<k8s.V1ConfigMap> {
+  const runnerInstanceLabel = new RunnerInstanceLabel()
+
+  const configMap = new k8s.V1ConfigMap()
+  configMap.apiVersion = 'v1'
+  configMap.kind = 'ConfigMap'
+  configMap.metadata = new k8s.V1ObjectMeta()
+  configMap.metadata.name = getStepPodName()
+  configMap.metadata.labels = {
+    [runnerInstanceLabel.key]: runnerInstanceLabel.value
+  }
+  configMap.data = data
+  configMap.binaryData = binaryData
+
+  const { body } = await k8sApi.createNamespacedConfigMap(
+    namespace(),
+    configMap
+  )
+  return body
+}
+
 export async function getContainerJobPodName(jobName: string): Promise<string> {
   const selector = `job-name=${jobName}`
   const backOffManager = new BackOffManager(60)
@@ -179,6 +218,15 @@ export async function deletePod(podName: string): Promise<void> {
   )
 }
 
+export async function deleteConfigMap(configMapName: string): Promise<void> {
+  await k8sApi.deleteNamespacedConfigMap(
+    configMapName,
+    namespace(),
+    undefined,
+    undefined,
+    0
+  )
+}
 export async function execPodStep(
   command: string[],
   podName: string,
@@ -391,6 +439,27 @@ export async function getPodLogs(
     timestamps: false
   })
   await new Promise(resolve => r.on('close', () => resolve(null)))
+}
+
+export async function pruneConfigMaps(): Promise<void> {
+  const configMapList = await k8sApi.listNamespacedConfigMap(
+    namespace(),
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    new RunnerInstanceLabel().toString()
+  )
+  if (!configMapList.body.items.length) {
+    return
+  }
+
+  await Promise.all(
+    configMapList.body.items.map(
+      configMap =>
+        configMap.metadata?.name && deleteConfigMap(configMap.metadata.name)
+    )
+  )
 }
 
 export async function prunePods(): Promise<void> {

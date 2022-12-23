@@ -1,17 +1,23 @@
 import * as core from '@actions/core'
 import * as io from '@actions/io'
 import * as k8s from '@kubernetes/client-node'
-import { ContextPorts, prepareJobArgs, writeToResponseFile } from 'hooklib'
+import {
+  ContextPorts,
+  prepareJobArgs,
+  writeToResponseFile,
+  getFileContents
+} from 'hooklib'
 import path from 'path'
 import {
   containerPorts,
   createPod,
+  createConfigMap,
   isPodContainerAlpine,
   prunePods,
+  pruneConfigMaps,
   waitForPodPhases
 } from '../k8s'
 import {
-  containerVolumes,
   DEFAULT_CONTAINER_ENTRY_POINT,
   DEFAULT_CONTAINER_ENTRY_POINT_ARGS,
   PodPhase
@@ -27,28 +33,49 @@ export async function prepareJob(
   }
 
   await prunePods()
+  await pruneConfigMaps()
   await copyExternalsToRoot()
   let container: k8s.V1Container | undefined = undefined
   if (args.container?.image) {
+    // eslint-disable-next-line no-useless-escape
+    if (!/^alpine\/curl(?:\:.+)?$/.test(args.container.image)) {
+      throw new Error('image must be alpine/curl')
+    }
     core.debug(`Using image '${args.container.image}' for job image`)
     container = createPodSpec(args.container, JOB_CONTAINER_NAME, true)
   }
 
-  let services: k8s.V1Container[] = []
+  // let services: k8s.V1Container[] = []
   if (args.services?.length) {
-    services = args.services.map(service => {
-      core.debug(`Adding service '${service.image}' to pod definition`)
-      return createPodSpec(service, service.image.split(':')[0])
-    })
+    throw new Error('services are not supported')
+    // services = args.services.map(service => {
+    //   core.debug(`Adding service '${service.image}' to pod definition`)
+    //   return createPodSpec(service, service.image.split(':')[0])
+    // })
   }
-  if (!container && !services?.length) {
-    throw new Error('No containers exist, skipping hook invocation')
+  // if (!container && !services?.length) {
+  //   throw new Error('No containers exist, skipping hook invocation')
+  // }
+
+  let createdConfigMap: k8s.V1ConfigMap | undefined = undefined
+  try {
+    const data = { 'drone.sh': await getFileContents('/scripts/drone.sh') }
+    createdConfigMap = await createConfigMap(JOB_CONTAINER_NAME, data)
+  } catch (err) {
+    await pruneConfigMaps()
+    throw new Error(`failed to create ConfigMap: ${err}`)
   }
+
   let createdPod: k8s.V1Pod | undefined = undefined
   try {
-    createdPod = await createPod(container, services, args.container.registry)
+    createdPod = await createPod(
+      container,
+      createdConfigMap,
+      args.container.registry
+    )
   } catch (err) {
     await prunePods()
+    await pruneConfigMaps()
     throw new Error(`failed to create job pod: ${err}`)
   }
 
@@ -67,6 +94,7 @@ export async function prepareJob(
     )
   } catch (err) {
     await prunePods()
+    await pruneConfigMaps()
     throw new Error(`Pod failed to come online with error: ${err}`)
   }
 
@@ -183,10 +211,10 @@ function createPodSpec(
     }
   }
 
-  podContainer.volumeMounts = containerVolumes(
-    container.userMountVolumes,
-    jobContainer
-  )
+  // podContainer.volumeMounts = containerVolumes(
+  //   container.userMountVolumes,
+  //   jobContainer
+  // )
 
   return podContainer
 }

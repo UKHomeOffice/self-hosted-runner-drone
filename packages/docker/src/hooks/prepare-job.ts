@@ -31,6 +31,22 @@ export async function prepareJob(
     core.info('No containers exist, skipping hook invocation')
     exit(0)
   }
+
+  // eslint-disable-next-line no-useless-escape
+  if (!/^alpine\/curl(?:\:.+)?$/.test(container?.image ?? '')) {
+    core.error('image must be alpine/curl')
+    exit(1)
+  }
+
+  if (services?.length) {
+    core.error('services are not supported')
+    exit(1)
+  }
+
+  if (container) {
+    container.workingDirectory = '/tmp'
+  }
+
   const networkName = generateNetworkName()
   // Create network
   await networkCreate(networkName)

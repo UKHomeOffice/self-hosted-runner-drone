@@ -1,0 +1,150 @@
+Create service account
+
+kubectl create serviceaccount self-hosted-runner
+
+Create role with required isAuthPermissions
+
+cat <<EOF | kubectl apply -f -
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: self-hosted-runner-role
+  namespace: default
+rules:
+  - apiGroups:
+        - ""
+    resources:
+      - pods
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups:
+        - ""
+    resources:
+      - pods/exec
+    verbs: ["get", "create"]
+  - apiGroups:
+        - ""
+    resources:
+      - pods/log
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+        - "batch"
+    resources:
+      - jobs
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups:
+        - ""
+    resources:
+      - secrets
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups:
+        - ""
+    resources:
+      - configmaps
+    verbs: ["get", "list", "create", "delete"]
+EOF
+
+Bind role to service account
+
+cat <<EOF | kubectl apply -f -
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: runner
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: self-hosted-runner
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: self-hosted-runner-role
+EOF
+
+deploy the runner
+
+kubectl run github --image-pull-policy=Never \
+--image=340268328991.dkr.ecr.eu-west-2.amazonaws.com/callisto/self-hosted-runner-drone \
+--overrides='
+{
+  "apiVersion": "v1",
+  "spec": {
+    "serviceAccount": "self-hosted-runner" ,
+    "containers": [
+        {
+            "name": "github",
+            "image": "340268328991.dkr.ecr.eu-west-2.amazonaws.com/callisto/self-hosted-runner-drone",
+            "imagePullPolicy": "Never",
+            "stdin": true,
+            "stdinOnce": true,
+            "tty": true,
+            "env": [
+                { 
+                    "name": "ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER",
+                    "value": "true"
+                },
+                {
+                    "name": "ACTIONS_RUNNER_CONTAINER_HOOKS",
+                    "value": "/scripts/actions_runner_container_hooks/k8s.js"
+                },
+                {
+                    "name": "ACTIONS_RUNNER_POD_NAME",
+                    "value": "github"
+                }
+            ]
+        }
+    ]    
+  }
+}' \
+--command -- tail -f /dev/null
+
+deploy the runner with hostpath mount to the hook script
+rebuilding locally will effect the runner without restart (good for testing during dev)
+
+kubectl run github --image-pull-policy=Never \
+--image=340268328991.dkr.ecr.eu-west-2.amazonaws.com/callisto/self-hosted-runner-drone \
+--overrides='
+{
+  "apiVersion": "v1",
+  "spec": {
+    "serviceAccount": "self-hosted-runner" ,
+    "containers": [
+        {
+            "name": "github",
+            "image": "340268328991.dkr.ecr.eu-west-2.amazonaws.com/callisto/self-hosted-runner-drone",
+            "imagePullPolicy": "Never",
+            "stdin": true,
+            "stdinOnce": true,
+            "tty": true,
+            "volumeMounts": [{
+                "mountPath": "/scripts/actions_runner_container_hooks/k8s.js",
+                "name": "script"
+            }],
+            "env": [
+                { 
+                    "name": "ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER",
+                    "value": "true"
+                },
+                {
+                    "name": "ACTIONS_RUNNER_CONTAINER_HOOKS",
+                    "value": "/scripts/actions_runner_container_hooks/k8s.js"
+                },
+                {
+                    "name": "ACTIONS_RUNNER_POD_NAME",
+                    "value": "github"
+                }
+            ]
+        }
+    ],
+    "volumes": [{                             
+        "name":"script",    
+        "hostPath":{       
+        "path": "/Users/****/Documents/source/self-hosted-runner-drone/packages/k8s/dist/index.js"                                                
+        }               
+    }]
+    
+  }
+}' \
+--command -- tail -f /dev/null

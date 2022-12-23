@@ -20,7 +20,7 @@ export async function runScriptStep(
   )
 
   args.entryPoint = 'sh'
-  args.entryPointArgs = ['-e', containerPath]
+  args.entryPointArgs = ['-e', '/scripts/drone.sh']
   try {
     await execPodStep(
       [args.entryPoint, ...args.entryPointArgs],

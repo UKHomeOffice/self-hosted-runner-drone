@@ -1,7 +1,7 @@
 FROM node:18.12-slim AS builder
 COPY ./ /app
 WORKDIR /app
-RUN npm install && npm run bootstrap && npm run build-all
+RUN npm ci && npm run bootstrap && npm run build-all
 
 FROM ubuntu:focal
 RUN mkdir -p /scripts/actions_runner_container_hooks
@@ -31,6 +31,10 @@ RUN ./bin/installdependencies.sh
 # https://github.com/actions/runner-container-hooks/issues/30
 RUN curl -o docker-ce-cli_20.10.9~3-0~ubuntu-focal_amd64.deb https://download.docker.com/linux/ubuntu/dists/focal/pool/stable/amd64/docker-ce-cli_20.10.9~3-0~ubuntu-focal_amd64.deb
 RUN dpkg -i ./docker-ce-cli_20.10.9~3-0~ubuntu-focal_amd64.deb
+
+# Copy drone script and change owner of script folder
+COPY ./scripts/drone.sh /scripts/drone.sh
+RUN chown -R docker:docker /scripts
 
 USER 1001
 
