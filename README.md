@@ -56,5 +56,4 @@ Throw an error if their step is not attempting to run drone
 Check drone token env var exists
 Build and push Image
 Branch protection for main and drone-only(effectively our main)
-Clean up downloaded files in dockerfile i.e. docker and actions installer
 Allow image name to be configured as admission control sometimes restricts registries and also to account for registry prefixes
