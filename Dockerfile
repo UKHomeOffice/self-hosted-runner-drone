@@ -36,5 +36,9 @@ RUN dpkg -i ./docker-ce-cli_20.10.9~3-0~ubuntu-focal_amd64.deb
 COPY ./scripts/drone.sh /scripts/drone.sh
 RUN chown -R docker:docker /scripts
 
+# Clean up downloaded files
+RUN rm -rf ./actions-runner-linux-x64-2.300.2.tar.gz
+RUN rm -rf ./docker-ce-cli_20.10.9~3-0~ubuntu-focal_amd64.deb
+
 USER 1001
 
