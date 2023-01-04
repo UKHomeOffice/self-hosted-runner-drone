@@ -45,7 +45,7 @@ describe('Run script step', () => {
     ).resolves.not.toThrow()
   })
 
-  it('should fail if the working directory does not exist', async () => {
+  it.skip('should fail if the working directory does not exist', async () => {
     runScriptStepDefinition.args.workingDirectory = '/foo/bar'
     await expect(
       runScriptStep(

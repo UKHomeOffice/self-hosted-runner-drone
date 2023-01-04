@@ -57,7 +57,7 @@ describe('prepare job', () => {
     const prepareJobArgsClone = JSON.parse(
       JSON.stringify(prepareJobDefinition.args)
     )
-    prepareJobArgsClone.container.image = 'alpine:latest'
+    prepareJobArgsClone.container.image = 'alpine/curl:latest'
     await prepareJob(prepareJobArgsClone, prepareJobOutput)
 
     let parsedPrepareJobOutput = JSON.parse(

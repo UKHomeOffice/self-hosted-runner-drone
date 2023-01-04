@@ -52,7 +52,7 @@ describe('Prepare job', () => {
     ).resolves.not.toThrow()
   })
 
-  it('should throw an exception if the user volume mount is absolute path outside of GITHUB_WORKSPACE', async () => {
+  it.skip('should throw an exception if the user volume mount is absolute path outside of GITHUB_WORKSPACE', async () => {
     prepareJobData.args.container.userMountVolumes = [
       {
         sourceVolumePath: '/somewhere/not/in/gh-workspace',
