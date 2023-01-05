@@ -1,7 +1,7 @@
 FROM node:18.12-slim AS builder
 COPY ./ /app
 WORKDIR /app
-RUN npm ci && npm run bootstrap && npm run build-all
+RUN npm install && npm run bootstrap && npm run build-all
 
 FROM ubuntu:focal
 RUN mkdir -p /scripts/actions_runner_container_hooks
